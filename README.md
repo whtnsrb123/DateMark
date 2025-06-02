@@ -18,7 +18,7 @@
   직관적이고 깔끔한 UI를 제공합니다.
 
   
-<img src="memo_app/flutter.png" width="50%">
+<img src="memo_app/flutter.png" width="25%">
 
 
 
