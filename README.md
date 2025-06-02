@@ -18,8 +18,7 @@
   직관적이고 깔끔한 UI를 제공합니다.
 
   
-<img src="memo_app/IOS_iPhone ver.png" width="25%">
-<img src="memo_app/MacOS ver.png" width="25%">
+<img src="memo_app/IOS_iPhone ver.png" width="25%"> <img src="memo_app/MacOS ver.png" width="50%">
 
 
 
