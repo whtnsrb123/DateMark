@@ -2,8 +2,6 @@
 
 > **직관적인 달력 기반 일정/메모 관리 앱**  
 > Flutter & Dart 기반, TableCalendar/Provider/ColorPicker 등 활용  
->  
-> ![screenshot](./screenshot.png) <!-- 실제 스크린샷 파일명을 맞춰주세요 -->
 
 ---
 
