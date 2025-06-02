@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_colorpicker/flutter_colorpicker.dart';
 import 'package:provider/provider.dart';
 import 'package:table_calendar/table_calendar.dart';
 import 'package:uuid/uuid.dart';
@@ -25,7 +26,7 @@ class MemoApp extends StatelessWidget {
       title: 'Memo App',
       theme: ThemeData(
         primarySwatch: Colors.blue,
-        scaffoldBackgroundColor: const Color(0xFFFAF6FA), // 달력과 메모 영역 동일한 배경색
+        scaffoldBackgroundColor: const Color(0xFFFAF6FA),
       ),
       home: const MainScreen(),
       debugShowCheckedModeBanner: false,
@@ -131,8 +132,8 @@ class MainScreen extends StatefulWidget {
 
 class _MainScreenState extends State<MainScreen> {
   DateTime _focusedDay = DateTime.now();
-  DateTime? _selectedDay = DateTime.now(); // 앱 실행 시 오늘 날짜 자동 선택
-  bool _showCategoryAdd = false;
+  DateTime? _selectedDay = DateTime.now();
+  bool _showSettings = false;
 
   final List<Color> _presetColors = [
     Colors.red,
@@ -147,115 +148,190 @@ class _MainScreenState extends State<MainScreen> {
     Colors.green,
   ];
 
+  void _goToPrevMonth() {
+    setState(() {
+      _focusedDay = DateTime(_focusedDay.year, _focusedDay.month - 1, 1);
+    });
+  }
+
+  void _goToNextMonth() {
+    setState(() {
+      _focusedDay = DateTime(_focusedDay.year, _focusedDay.month + 1, 1);
+    });
+  }
+
+  void _showCategoryAddDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => CategoryAddDialog(presetColors: _presetColors),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Memo App')),
-      body: Column(
-        children: [
-          Stack(
-            children: [
-              CalendarSection(
+      // AppBar 없이 직접 상단 Row로 커스텀 헤더
+      body: SafeArea(
+        child: Column(
+          children: [
+            // 상단 헤더 (월 이동 + 월 타이틀 + 설정 버튼)
+            Padding(
+              padding: const EdgeInsets.only(top: 16, left: 8, right: 8, bottom: 0),
+              child: Row(
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.chevron_left, size: 28),
+                    onPressed: _goToPrevMonth,
+                  ),
+                  Expanded(
+                    child: Center(
+                      child: Text(
+                        DateFormat('MMMM yyyy').format(_focusedDay),
+                        style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+                      ),
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.chevron_right, size: 28),
+                    onPressed: _goToNextMonth,
+                  ),
+                  const SizedBox(width: 16),
+                  IconButton(
+                    icon: const Icon(Icons.settings, size: 28),
+                    tooltip: '설정',
+                    onPressed: () => setState(() => _showSettings = !_showSettings),
+                  ),
+                ],
+              ),
+            ),
+            // 설정 패널 (설정 버튼 클릭 시)
+            if (_showSettings)
+              Padding(
+                padding: const EdgeInsets.only(top: 8, right: 16),
+                child: Align(
+                  alignment: Alignment.topRight,
+                  child: SettingsPanel(
+                    onAddCategory: _showCategoryAddDialog,
+                    onClose: () => setState(() => _showSettings = false),
+                  ),
+                ),
+              ),
+            // 달력
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8.0),
+              child: TableCalendar(
+                firstDay: DateTime.utc(2000, 1, 1),
+                lastDay: DateTime.utc(2100, 12, 31),
                 focusedDay: _focusedDay,
-                selectedDay: _selectedDay,
+                selectedDayPredicate: (day) => isSameDay(_selectedDay, day),
                 onDaySelected: (selectedDay, focusedDay) {
                   setState(() {
                     _selectedDay = selectedDay;
                     _focusedDay = focusedDay;
                   });
                 },
-              ),
-              Positioned(
-                top: 12,
-                right: 24,
-                child: IconButton(
-                  icon: const Icon(Icons.add, size: 28),
-                  onPressed: () => setState(() => _showCategoryAdd = !_showCategoryAdd),
-                ),
-              ),
-              if (_showCategoryAdd)
-                Positioned(
-                  top: 56,
-                  right: 24,
-                  child: CategoryAddPanel(
-                    presetColors: _presetColors,
-                    onAdd: () => setState(() => _showCategoryAdd = false),
-                    onCancel: () => setState(() => _showCategoryAdd = false),
+                calendarFormat: CalendarFormat.month,
+                headerVisible: false, // 기본 헤더 숨김
+                calendarStyle: CalendarStyle(
+                  weekendTextStyle: const TextStyle(color: Colors.red),
+                  defaultTextStyle: const TextStyle(color: Colors.black),
+                  selectedDecoration: BoxDecoration(
+                    color: Colors.blue[300],
+                    shape: BoxShape.circle,
+                  ),
+                  todayDecoration: BoxDecoration(
+                    color: Colors.blue[100],
+                    shape: BoxShape.circle,
                   ),
                 ),
-            ],
-          ),
-          Expanded(
-            child: MemoSection(selectedDate: _selectedDay),
-          ),
-        ],
+                calendarBuilders: CalendarBuilders(
+                  dowBuilder: (context, day) {
+                    if (day.weekday == DateTime.sunday) {
+                      return const Center(child: Text('Sun', style: TextStyle(color: Colors.red)));
+                    }
+                    if (day.weekday == DateTime.saturday) {
+                      return const Center(child: Text('Sat', style: TextStyle(color: Colors.red)));
+                    }
+                    return null;
+                  },
+                ),
+              ),
+            ),
+            // 메모 UI
+            Expanded(
+              child: MemoSection(selectedDate: _selectedDay),
+            ),
+          ],
+        ),
       ),
     );
   }
 }
 
-// 달력 위젯
-class CalendarSection extends StatelessWidget {
-  final DateTime focusedDay;
-  final DateTime? selectedDay;
-  final void Function(DateTime, DateTime) onDaySelected;
+// 설정 패널
+class SettingsPanel extends StatelessWidget {
+  final VoidCallback onAddCategory;
+  final VoidCallback onClose;
 
-  const CalendarSection({
-    super.key,
-    required this.focusedDay,
-    required this.selectedDay,
-    required this.onDaySelected,
-  });
+  const SettingsPanel({super.key, required this.onAddCategory, required this.onClose});
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.all(16.0),
-      child: TableCalendar(
-        firstDay: DateTime.utc(2000, 1, 1),
-        lastDay: DateTime.utc(2100, 12, 31),
-        focusedDay: focusedDay,
-        selectedDayPredicate: (day) => isSameDay(selectedDay, day),
-        onDaySelected: onDaySelected,
-        calendarStyle: CalendarStyle(
-          weekendTextStyle: const TextStyle(color: Colors.red),
-          defaultTextStyle: const TextStyle(color: Colors.black),
-          selectedDecoration: BoxDecoration(
-            color: Colors.blue[300],
-            shape: BoxShape.circle,
-          ),
-          todayDecoration: BoxDecoration(
-            color: Colors.blue[100],
-            shape: BoxShape.circle,
-          ),
+    return Material(
+      elevation: 8,
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        width: 180,
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: Colors.blue.withOpacity(0.2)),
         ),
-        headerStyle: const HeaderStyle(formatButtonVisible: false, titleCentered: true),
-        calendarBuilders: CalendarBuilders(
-          dowBuilder: (context, day) {
-            if (day.weekday == DateTime.sunday) {
-              return const Center(child: Text('Sun', style: TextStyle(color: Colors.red)));
-            }
-            return null;
-          },
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Row(
+              children: [
+                const Text('설정', style: TextStyle(fontWeight: FontWeight.bold)),
+                const Spacer(),
+                IconButton(
+                  icon: const Icon(Icons.close),
+                  onPressed: onClose,
+                  iconSize: 20,
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(),
+                ),
+              ],
+            ),
+            const Divider(),
+            ListTile(
+              leading: const Icon(Icons.add, color: Colors.blue),
+              title: const Text('카테고리 추가'),
+              onTap: () {
+                onAddCategory();
+                onClose();
+              },
+              contentPadding: EdgeInsets.zero,
+              dense: true,
+            ),
+          ],
         ),
       ),
     );
   }
 }
 
-// 카테고리 추가 패널
-class CategoryAddPanel extends StatefulWidget {
+// 카테고리 추가 다이얼로그
+class CategoryAddDialog extends StatefulWidget {
   final List<Color> presetColors;
-  final VoidCallback onAdd;
-  final VoidCallback onCancel;
-
-  const CategoryAddPanel({super.key, required this.presetColors, required this.onAdd, required this.onCancel});
+  const CategoryAddDialog({super.key, required this.presetColors});
 
   @override
-  State<CategoryAddPanel> createState() => _CategoryAddPanelState();
+  State<CategoryAddDialog> createState() => _CategoryAddDialogState();
 }
 
-class _CategoryAddPanelState extends State<CategoryAddPanel> {
+class _CategoryAddDialogState extends State<CategoryAddDialog> {
   final TextEditingController _nameController = TextEditingController();
   late Color _selectedColor;
 
@@ -267,72 +343,56 @@ class _CategoryAddPanelState extends State<CategoryAddPanel> {
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      elevation: 8,
-      borderRadius: BorderRadius.circular(16),
-      child: Container(
-        padding: const EdgeInsets.all(16),
-        width: 220,
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: Colors.blue.withOpacity(0.2)),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Text('카테고리 추가', style: TextStyle(fontWeight: FontWeight.bold)),
-            const SizedBox(height: 8),
-            TextField(
-              controller: _nameController,
-              decoration: const InputDecoration(labelText: '카테고리 이름'),
-            ),
-            const SizedBox(height: 12),
-            Wrap(
-              spacing: 8,
-              children: widget.presetColors.map((color) {
-                return GestureDetector(
-                  onTap: () => setState(() => _selectedColor = color),
-                  child: CircleAvatar(
-                    backgroundColor: color,
-                    radius: 16,
-                    child: _selectedColor == color 
-                        ? const Icon(Icons.check, color: Colors.white, size: 18) 
-                        : null,
-                  ),
-                );
-              }).toList(),
-            ),
-            const SizedBox(height: 12),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.end,
-              children: [
-                TextButton(
-                  onPressed: widget.onCancel,
-                  child: const Text('취소'),
+    return AlertDialog(
+      title: const Text('카테고리 추가'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          TextField(
+            controller: _nameController,
+            decoration: const InputDecoration(labelText: '카테고리 이름'),
+          ),
+          const SizedBox(height: 12),
+          Wrap(
+            spacing: 8,
+            children: widget.presetColors.map((color) {
+              return GestureDetector(
+                onTap: () => setState(() => _selectedColor = color),
+                child: CircleAvatar(
+                  backgroundColor: color,
+                  radius: 16,
+                  child: _selectedColor == color
+                      ? const Icon(Icons.check, color: Colors.white, size: 18)
+                      : null,
                 ),
-                ElevatedButton(
-                  onPressed: () {
-                    if (_nameController.text.trim().isNotEmpty) {
-                      context.read<CategoryProvider>().addCategory(
-                        _nameController.text.trim(),
-                        _selectedColor,
-                      );
-                      widget.onAdd();
-                    }
-                  },
-                  child: const Text('추가'),
-                ),
-              ],
-            ),
-          ],
-        ),
+              );
+            }).toList(),
+          ),
+        ],
       ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('취소'),
+        ),
+        ElevatedButton(
+          onPressed: () {
+            if (_nameController.text.trim().isNotEmpty) {
+              context.read<CategoryProvider>().addCategory(
+                _nameController.text.trim(),
+                _selectedColor,
+              );
+              Navigator.pop(context);
+            }
+          },
+          child: const Text('추가'),
+        ),
+      ],
     );
   }
 }
 
-// 메모 영역
+// 메모 영역 (카테고리별 메모 목록/입력)
 class MemoSection extends StatelessWidget {
   final DateTime? selectedDate;
 
@@ -342,14 +402,19 @@ class MemoSection extends StatelessWidget {
   Widget build(BuildContext context) {
     final categories = context.watch<CategoryProvider>().categories;
 
+    if (selectedDate == null) {
+      return const SizedBox();
+    }
+
     return Padding(
       padding: const EdgeInsets.all(16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // 좌측 상단에 작은 날짜 표시
-          if (selectedDate != null)
-            Text(
+          // 좌측 상단에 작은 날짜만 표시 (투명/달력 배경)
+          Padding(
+            padding: const EdgeInsets.only(left: 4, top: 4, bottom: 8),
+            child: Text(
               DateFormat('yyyy/MM/dd').format(selectedDate!),
               style: const TextStyle(
                 fontSize: 14,
@@ -357,7 +422,7 @@ class MemoSection extends StatelessWidget {
                 fontWeight: FontWeight.w500,
               ),
             ),
-          const SizedBox(height: 16),
+          ),
           // 메모 목록
           Expanded(
             child: SingleChildScrollView(
@@ -381,6 +446,7 @@ class MemoSection extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Container(
+          margin: const EdgeInsets.only(top: 16),
           padding: const EdgeInsets.symmetric(vertical: 8),
           decoration: BoxDecoration(
             border: Border(bottom: BorderSide(color: category.color)),
