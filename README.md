@@ -18,8 +18,7 @@
   직관적이고 깔끔한 UI를 제공합니다.
 
   
-<img src="flutter.png" width="120"/>
-
+<img src="./flutter.png" width="200">
 
 
 ---
