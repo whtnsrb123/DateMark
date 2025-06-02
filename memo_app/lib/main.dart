@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_colorpicker/flutter_colorpicker.dart';
 import 'package:provider/provider.dart';
 import 'package:table_calendar/table_calendar.dart';
 import 'package:uuid/uuid.dart';
@@ -24,14 +23,17 @@ class MemoApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'Memo App',
-      theme: ThemeData(primarySwatch: Colors.blue),
+      theme: ThemeData(
+        primarySwatch: Colors.blue,
+        scaffoldBackgroundColor: const Color(0xFFFAF6FA), // 달력과 메모 영역 동일한 배경색
+      ),
       home: const MainScreen(),
       debugShowCheckedModeBanner: false,
     );
   }
 }
 
-// 데이터 모델 -----------------------------------------------------------------
+// 데이터 모델
 class Memo {
   final String id;
   final String content;
@@ -64,7 +66,7 @@ class Category {
   });
 }
 
-// 상태 관리 -----------------------------------------------------------------
+// 상태 관리
 class MemoProvider extends ChangeNotifier {
   final Map<DateTime, List<Memo>> _memos = {};
   final Uuid _uuid = const Uuid();
@@ -119,50 +121,91 @@ class CategoryProvider extends ChangeNotifier {
   }
 }
 
-// 메인 화면 -----------------------------------------------------------------
-class MainScreen extends StatelessWidget {
+// 메인 화면
+class MainScreen extends StatefulWidget {
   const MainScreen({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    final size = MediaQuery.of(context).size;
-    final isWide = size.width > 600;
-
-    return Scaffold(
-      appBar: AppBar(title: const Text('Memo App')),
-      body: isWide ? _buildWideLayout() : _buildMobileLayout(),
-    );
-  }
-
-  Widget _buildWideLayout() => Row(
-    children: [
-      Expanded(flex: 2, child: _buildCalendarSection()),
-      Expanded(flex: 1, child: _buildMemoSection()),
-    ],
-  );
-
-  Widget _buildMobileLayout() => Column(
-    children: [
-      Expanded(flex: 2, child: _buildCalendarSection()),
-      Expanded(flex: 1, child: _buildMemoSection()),
-    ],
-  );
-
-  Widget _buildCalendarSection() => const CalendarSection();
-  Widget _buildMemoSection() => const Placeholder(); // 실제 구현 필요
+  State<MainScreen> createState() => _MainScreenState();
 }
 
-// 달력 부분 -----------------------------------------------------------------
-class CalendarSection extends StatefulWidget {
-  const CalendarSection({super.key});
+class _MainScreenState extends State<MainScreen> {
+  DateTime _focusedDay = DateTime.now();
+  DateTime? _selectedDay = DateTime.now(); // 앱 실행 시 오늘 날짜 자동 선택
+  bool _showCategoryAdd = false;
+
+  final List<Color> _presetColors = [
+    Colors.red,
+    Colors.pink,
+    Colors.purple,
+    Colors.deepPurple,
+    Colors.indigo,
+    Colors.blue,
+    Colors.lightBlue,
+    Colors.cyan,
+    Colors.teal,
+    Colors.green,
+  ];
 
   @override
-  State<CalendarSection> createState() => _CalendarSectionState();
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text('Memo App')),
+      body: Column(
+        children: [
+          Stack(
+            children: [
+              CalendarSection(
+                focusedDay: _focusedDay,
+                selectedDay: _selectedDay,
+                onDaySelected: (selectedDay, focusedDay) {
+                  setState(() {
+                    _selectedDay = selectedDay;
+                    _focusedDay = focusedDay;
+                  });
+                },
+              ),
+              Positioned(
+                top: 12,
+                right: 24,
+                child: IconButton(
+                  icon: const Icon(Icons.add, size: 28),
+                  onPressed: () => setState(() => _showCategoryAdd = !_showCategoryAdd),
+                ),
+              ),
+              if (_showCategoryAdd)
+                Positioned(
+                  top: 56,
+                  right: 24,
+                  child: CategoryAddPanel(
+                    presetColors: _presetColors,
+                    onAdd: () => setState(() => _showCategoryAdd = false),
+                    onCancel: () => setState(() => _showCategoryAdd = false),
+                  ),
+                ),
+            ],
+          ),
+          Expanded(
+            child: MemoSection(selectedDate: _selectedDay),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
-class _CalendarSectionState extends State<CalendarSection> {
-  DateTime _focusedDay = DateTime.now();
-  DateTime? _selectedDay;
+// 달력 위젯
+class CalendarSection extends StatelessWidget {
+  final DateTime focusedDay;
+  final DateTime? selectedDay;
+  final void Function(DateTime, DateTime) onDaySelected;
+
+  const CalendarSection({
+    super.key,
+    required this.focusedDay,
+    required this.selectedDay,
+    required this.onDaySelected,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -171,219 +214,235 @@ class _CalendarSectionState extends State<CalendarSection> {
       child: TableCalendar(
         firstDay: DateTime.utc(2000, 1, 1),
         lastDay: DateTime.utc(2100, 12, 31),
-        focusedDay: _focusedDay,
-        selectedDayPredicate: (day) => isSameDay(_selectedDay, day),
-        onDaySelected: _onDaySelected,
-        calendarStyle: _buildCalendarStyle(),
+        focusedDay: focusedDay,
+        selectedDayPredicate: (day) => isSameDay(selectedDay, day),
+        onDaySelected: onDaySelected,
+        calendarStyle: CalendarStyle(
+          weekendTextStyle: const TextStyle(color: Colors.red),
+          defaultTextStyle: const TextStyle(color: Colors.black),
+          selectedDecoration: BoxDecoration(
+            color: Colors.blue[300],
+            shape: BoxShape.circle,
+          ),
+          todayDecoration: BoxDecoration(
+            color: Colors.blue[100],
+            shape: BoxShape.circle,
+          ),
+        ),
         headerStyle: const HeaderStyle(formatButtonVisible: false, titleCentered: true),
-        calendarBuilders: _buildCalendarCustom(),
+        calendarBuilders: CalendarBuilders(
+          dowBuilder: (context, day) {
+            if (day.weekday == DateTime.sunday) {
+              return const Center(child: Text('Sun', style: TextStyle(color: Colors.red)));
+            }
+            return null;
+          },
+        ),
       ),
     );
   }
-
-  void _onDaySelected(DateTime selectedDay, DateTime focusedDay) {
-    setState(() {
-      _selectedDay = selectedDay;
-      _focusedDay = focusedDay;
-    });
-    _showMemoDialog(context, selectedDay);
-  }
-
-  CalendarStyle _buildCalendarStyle() => CalendarStyle(
-    weekendTextStyle: const TextStyle(color: Colors.red),
-    defaultTextStyle: const TextStyle(color: Colors.black),
-    selectedDecoration: BoxDecoration(
-      color: Colors.blue[300],
-      shape: BoxShape.circle,
-    ),
-    todayDecoration: BoxDecoration(
-      color: Colors.blue[100],
-      shape: BoxShape.circle,
-    ),
-  );
-
-  CalendarBuilders _buildCalendarCustom() => CalendarBuilders(
-    dowBuilder: (context, day) {
-      if (day.weekday == DateTime.sunday) {
-        return const Center(child: Text('Sun', style: TextStyle(color: Colors.red)));
-      }
-      return null;
-    },
-  );
 }
 
-// 메모 다이얼로그 ------------------------------------------------------------
-void _showMemoDialog(BuildContext context, DateTime date) {
-  showDialog(
-    context: context,
-    builder: (context) => AlertDialog(
-      content: SizedBox(
-        width: MediaQuery.of(context).size.width * 0.9,
-        child: MemoDialog(date: date),
-      ),
-    ),
-  );
-}
+// 카테고리 추가 패널
+class CategoryAddPanel extends StatefulWidget {
+  final List<Color> presetColors;
+  final VoidCallback onAdd;
+  final VoidCallback onCancel;
 
-class MemoDialog extends StatefulWidget {
-  final DateTime date;
-  const MemoDialog({super.key, required this.date});
+  const CategoryAddPanel({super.key, required this.presetColors, required this.onAdd, required this.onCancel});
 
   @override
-  State<MemoDialog> createState() => _MemoDialogState();
+  State<CategoryAddPanel> createState() => _CategoryAddPanelState();
 }
 
-class _MemoDialogState extends State<MemoDialog> {
-  final TextEditingController _controller = TextEditingController();
-  String? _selectedCategoryId;
+class _CategoryAddPanelState extends State<CategoryAddPanel> {
+  final TextEditingController _nameController = TextEditingController();
+  late Color _selectedColor;
+
+  @override
+  void initState() {
+    super.initState();
+    _selectedColor = widget.presetColors.first;
+  }
 
   @override
   Widget build(BuildContext context) {
-    final memos = context.watch<MemoProvider>().getMemosForDate(widget.date);
-    final categories = context.watch<CategoryProvider>().categories;
-
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        _buildHeader(),
-        _buildCategorySection(categories),
-        _buildMemoList(memos),
-        _buildInputSection(categories),
-      ],
-    );
-  }
-
-  Widget _buildHeader() => Row(
-    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-    children: [
-      Text(DateFormat('yyyy/MM/dd').format(widget.date)),
-      IconButton(
-        icon: const Icon(Icons.close),
-        onPressed: () => Navigator.pop(context),
-      ),
-    ],
-  );
-
-  Widget _buildCategorySection(List<Category> categories) => Column(
-    children: [
-      Row(
-        children: [
-          const Text('카테고리:'),
-          ...categories.map((category) => Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 4.0),
-            child: ChoiceChip(
-              label: Text(category.name),
-              selected: _selectedCategoryId == category.id,
-              onSelected: (_) => setState(() => _selectedCategoryId = category.id),
-              backgroundColor: category.color.withOpacity(0.2),
-              selectedColor: category.color,
-              labelStyle: TextStyle(
-                color: _selectedCategoryId == category.id ? Colors.white : Colors.black,
-              ),
-            ),
-          )).toList(),
-          IconButton(
-            icon: const Icon(Icons.add),
-            onPressed: _showAddCategoryDialog,
-          ),
-        ],
-      ),
-      const Divider(),
-    ],
-  );
-
-  Widget _buildMemoList(List<Memo> memos) => Expanded(
-    child: ListView.builder(
-      itemCount: memos.length,
-      itemBuilder: (context, index) => ListTile(
-        leading: Checkbox(
-          value: memos[index].isChecked,
-          onChanged: (_) => context.read<MemoProvider>().toggleCheck(memos[index].id),
+    return Material(
+      elevation: 8,
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        width: 220,
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: Colors.blue.withOpacity(0.2)),
         ),
-        title: Text(memos[index].content),
-        trailing: IconButton(
-          icon: const Icon(Icons.delete),
-          onPressed: () => context.read<MemoProvider>().deleteMemo(memos[index].id),
-        ),
-        tileColor: _getCategoryColor(memos[index].categoryId).withOpacity(0.1),
-      ),
-    ),
-  );
-
-  Widget _buildInputSection(List<Category> categories) => Row(
-    children: [
-      Expanded(
-        child: TextField(
-          controller: _controller,
-          decoration: const InputDecoration(hintText: '새 메모 입력'),
-          onSubmitted: (_) => _addMemo(),
-        ),
-      ),
-      IconButton(
-        icon: const Icon(Icons.add),
-        onPressed: _addMemo,
-      ),
-    ],
-  );
-
-  Color _getCategoryColor(String categoryId) => 
-      context.read<CategoryProvider>().categories
-          .firstWhere((cat) => cat.id == categoryId).color;
-
-  void _addMemo() {
-    if (_controller.text.isNotEmpty && _selectedCategoryId != null) {
-      context.read<MemoProvider>().addMemo(
-        widget.date, 
-        _controller.text, 
-        _selectedCategoryId!
-      );
-      _controller.clear();
-    }
-  }
-
-  void _showAddCategoryDialog() {
-    Color selectedColor = Colors.blue;
-    final nameController = TextEditingController();
-
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('새 카테고리 추가'),
-        content: Column(
+        child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
+            const Text('카테고리 추가', style: TextStyle(fontWeight: FontWeight.bold)),
+            const SizedBox(height: 8),
             TextField(
-              controller: nameController,
+              controller: _nameController,
               decoration: const InputDecoration(labelText: '카테고리 이름'),
             ),
-            const SizedBox(height: 20),
-            ColorPicker(
-              pickerColor: selectedColor,
-              onColorChanged: (color) => selectedColor = color,
-              showLabel: true,
-              pickerAreaHeightPercent: 0.8,
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 8,
+              children: widget.presetColors.map((color) {
+                return GestureDetector(
+                  onTap: () => setState(() => _selectedColor = color),
+                  child: CircleAvatar(
+                    backgroundColor: color,
+                    radius: 16,
+                    child: _selectedColor == color 
+                        ? const Icon(Icons.check, color: Colors.white, size: 18) 
+                        : null,
+                  ),
+                );
+              }).toList(),
+            ),
+            const SizedBox(height: 12),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                TextButton(
+                  onPressed: widget.onCancel,
+                  child: const Text('취소'),
+                ),
+                ElevatedButton(
+                  onPressed: () {
+                    if (_nameController.text.trim().isNotEmpty) {
+                      context.read<CategoryProvider>().addCategory(
+                        _nameController.text.trim(),
+                        _selectedColor,
+                      );
+                      widget.onAdd();
+                    }
+                  },
+                  child: const Text('추가'),
+                ),
+              ],
             ),
           ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('취소'),
-          ),
-          TextButton(
-            onPressed: () {
-              if (nameController.text.isNotEmpty) {
-                context.read<CategoryProvider>().addCategory(
-                  nameController.text, 
-                  selectedColor
-                );
-                Navigator.pop(context);
-              }
-            },
-            child: const Text('추가'),
+      ),
+    );
+  }
+}
+
+// 메모 영역
+class MemoSection extends StatelessWidget {
+  final DateTime? selectedDate;
+
+  const MemoSection({super.key, this.selectedDate});
+
+  @override
+  Widget build(BuildContext context) {
+    final categories = context.watch<CategoryProvider>().categories;
+
+    return Padding(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // 좌측 상단에 작은 날짜 표시
+          if (selectedDate != null)
+            Text(
+              DateFormat('yyyy/MM/dd').format(selectedDate!),
+              style: const TextStyle(
+                fontSize: 14,
+                color: Colors.grey,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          const SizedBox(height: 16),
+          // 메모 목록
+          Expanded(
+            child: SingleChildScrollView(
+              child: Column(
+                children: categories.map((category) => _buildCategorySection(context, category, selectedDate!)).toList(),
+              ),
+            ),
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildCategorySection(BuildContext context, Category category, DateTime date) {
+    final memos = context.watch<MemoProvider>().getMemosForDate(date)
+        .where((memo) => memo.categoryId == category.id)
+        .toList();
+    final TextEditingController _controller = TextEditingController();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          decoration: BoxDecoration(
+            border: Border(bottom: BorderSide(color: category.color)),
+          ),
+          child: Row(
+            children: [
+              Icon(Icons.circle, color: category.color, size: 16),
+              const SizedBox(width: 8),
+              Text(
+                category.name,
+                style: TextStyle(
+                  color: category.color,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 16,
+                ),
+              ),
+            ],
+          ),
+        ),
+        ...memos.map((memo) => ListTile(
+          leading: Checkbox(
+            value: memo.isChecked,
+            onChanged: (_) => context.read<MemoProvider>().toggleCheck(memo.id),
+          ),
+          title: Text(memo.content),
+          trailing: IconButton(
+            icon: const Icon(Icons.delete, color: Colors.red),
+            onPressed: () => context.read<MemoProvider>().deleteMemo(memo.id),
+          ),
+        )),
+        Padding(
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          child: Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: _controller,
+                  decoration: InputDecoration(
+                    hintText: '${category.name}에 메모 추가',
+                    border: const OutlineInputBorder(),
+                  ),
+                  onSubmitted: (value) {
+                    if (value.isNotEmpty) {
+                      context.read<MemoProvider>().addMemo(date, value, category.id);
+                      _controller.clear();
+                    }
+                  },
+                ),
+              ),
+              IconButton(
+                icon: const Icon(Icons.add),
+                onPressed: () {
+                  if (_controller.text.isNotEmpty) {
+                    context.read<MemoProvider>().addMemo(date, _controller.text, category.id);
+                    _controller.clear();
+                  }
+                },
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 }
