@@ -170,97 +170,112 @@ class _MainScreenState extends State<MainScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      // AppBar 없이 직접 상단 Row로 커스텀 헤더
       body: SafeArea(
-        child: Column(
+        child: Stack(
           children: [
-            // 상단 헤더 (월 이동 + 월 타이틀 + 설정 버튼)
-            Padding(
-              padding: const EdgeInsets.only(top: 16, left: 8, right: 8, bottom: 0),
-              child: Row(
-                children: [
-                  IconButton(
-                    icon: const Icon(Icons.chevron_left, size: 28),
-                    onPressed: _goToPrevMonth,
+            // 메인 컨텐츠 (달력 + 메모)
+            Column(
+              children: [
+                // 상단 헤더 (월 이동 + 월 타이틀 + 설정 버튼)
+                Padding(
+                  padding: const EdgeInsets.only(top: 16, left: 8, right: 8, bottom: 0),
+                  child: Row(
+                    children: [
+                      IconButton(
+                        icon: const Icon(Icons.chevron_left, size: 28),
+                        onPressed: _goToPrevMonth,
+                      ),
+                      Expanded(
+                        child: Center(
+                          child: Text(
+                            DateFormat('MMMM yyyy').format(_focusedDay),
+                            style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+                          ),
+                        ),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.chevron_right, size: 28),
+                        onPressed: _goToNextMonth,
+                      ),
+                      const SizedBox(width: 16),
+                      IconButton(
+                        icon: const Icon(Icons.settings, size: 28),
+                        tooltip: '설정',
+                        onPressed: () => setState(() => _showSettings = !_showSettings),
+                      ),
+                    ],
                   ),
-                  Expanded(
-                    child: Center(
-                      child: Text(
-                        DateFormat('MMMM yyyy').format(_focusedDay),
-                        style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+                ),
+                // 달력
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 8.0),
+                  child: TableCalendar(
+                    firstDay: DateTime.utc(2000, 1, 1),
+                    lastDay: DateTime.utc(2100, 12, 31),
+                    focusedDay: _focusedDay,
+                    selectedDayPredicate: (day) => isSameDay(_selectedDay, day),
+                    onDaySelected: (selectedDay, focusedDay) {
+                      setState(() {
+                        _selectedDay = selectedDay;
+                        _focusedDay = focusedDay;
+                      });
+                    },
+                    calendarFormat: CalendarFormat.month,
+                    headerVisible: false, // 기본 헤더 숨김
+                    calendarStyle: CalendarStyle(
+                      weekendTextStyle: const TextStyle(color: Colors.red),
+                      defaultTextStyle: const TextStyle(color: Colors.black),
+                      selectedDecoration: BoxDecoration(
+                        color: Colors.blue[300],
+                        shape: BoxShape.circle,
+                      ),
+                      todayDecoration: BoxDecoration(
+                        color: Colors.blue[100],
+                        shape: BoxShape.circle,
                       ),
                     ),
+                    calendarBuilders: CalendarBuilders(
+                      dowBuilder: (context, day) {
+                        if (day.weekday == DateTime.sunday) {
+                          return const Center(child: Text('Sun', style: TextStyle(color: Colors.red)));
+                        }
+                        if (day.weekday == DateTime.saturday) {
+                          return const Center(child: Text('Sat', style: TextStyle(color: Colors.blue)));
+                        }
+                        return null;
+                      },
+                      defaultBuilder: (context, day, focusedDay) {
+                        Color textColor;
+                        if (day.weekday == DateTime.sunday) {
+                          textColor = Colors.red;
+                        } else if (day.weekday == DateTime.saturday) {
+                          textColor = Colors.blue;
+                        } else {
+                          textColor = Colors.black;
+                        }
+                        return Center(
+                          child: Text('${day.day}', style: TextStyle(color: textColor)),
+                        );
+                      },
+                    ),
                   ),
-                  IconButton(
-                    icon: const Icon(Icons.chevron_right, size: 28),
-                    onPressed: _goToNextMonth,
-                  ),
-                  const SizedBox(width: 16),
-                  IconButton(
-                    icon: const Icon(Icons.settings, size: 28),
-                    tooltip: '설정',
-                    onPressed: () => setState(() => _showSettings = !_showSettings),
-                  ),
-                ],
-              ),
+                ),
+                // 메모 UI
+                Expanded(
+                  child: MemoSection(selectedDate: _selectedDay),
+                ),
+              ],
             ),
-            // 설정 패널 (설정 버튼 클릭 시)
+            // 설정 팝업 (overlay처럼 달력 위에 표시)
             if (_showSettings)
-              Padding(
-                padding: const EdgeInsets.only(top: 8, right: 16),
-                child: Align(
-                  alignment: Alignment.topRight,
-                  child: SettingsPanel(
-                    onAddCategory: _showCategoryAddDialog,
-                    onClose: () => setState(() => _showSettings = false),
-                  ),
+              Positioned(
+                top: 80, // 설정 버튼 아래쪽에 위치
+                right: 16,
+                child: SettingsPanel(
+                  onAddCategory: _showCategoryAddDialog,
+                  onClose: () => setState(() => _showSettings = false),
                 ),
               ),
-            // 달력
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 8.0),
-              child: TableCalendar(
-                firstDay: DateTime.utc(2000, 1, 1),
-                lastDay: DateTime.utc(2100, 12, 31),
-                focusedDay: _focusedDay,
-                selectedDayPredicate: (day) => isSameDay(_selectedDay, day),
-                onDaySelected: (selectedDay, focusedDay) {
-                  setState(() {
-                    _selectedDay = selectedDay;
-                    _focusedDay = focusedDay;
-                  });
-                },
-                calendarFormat: CalendarFormat.month,
-                headerVisible: false, // 기본 헤더 숨김
-                calendarStyle: CalendarStyle(
-                  weekendTextStyle: const TextStyle(color: Colors.red),
-                  defaultTextStyle: const TextStyle(color: Colors.black),
-                  selectedDecoration: BoxDecoration(
-                    color: Colors.blue[300],
-                    shape: BoxShape.circle,
-                  ),
-                  todayDecoration: BoxDecoration(
-                    color: Colors.blue[100],
-                    shape: BoxShape.circle,
-                  ),
-                ),
-                calendarBuilders: CalendarBuilders(
-                  dowBuilder: (context, day) {
-                    if (day.weekday == DateTime.sunday) {
-                      return const Center(child: Text('Sun', style: TextStyle(color: Colors.red)));
-                    }
-                    if (day.weekday == DateTime.saturday) {
-                      return const Center(child: Text('Sat', style: TextStyle(color: Colors.red)));
-                    }
-                    return null;
-                  },
-                ),
-              ),
-            ),
-            // 메모 UI
-            Expanded(
-              child: MemoSection(selectedDate: _selectedDay),
-            ),
           ],
         ),
       ),
@@ -268,7 +283,7 @@ class _MainScreenState extends State<MainScreen> {
   }
 }
 
-// 설정 패널
+// 설정 패널 (카테고리 추가 버튼 복원)
 class SettingsPanel extends StatelessWidget {
   final VoidCallback onAddCategory;
   final VoidCallback onClose;
