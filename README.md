@@ -97,3 +97,16 @@
 ---
 
 **이 프로젝트는 Flutter를 활용한 달력/메모/카테고리 관리 앱의 실전 구조와 UI/UX를 경험해보고 싶은 분께 추천합니다.**
+
+## 🔗 개인 프로젝트 목록
+📅 [메모 앱](https://github.com/whtnsrb123/DateMark)  
+   → 이 프로젝트는 Flutter와 Dart로 제작된, 직관적인 달력 기반의 일정/메모 관리 앱입니다  
+   
+⚙️ 개발 환경 및 기술  
+   Flutter 3.x / Dart  
+   table_calendar, provider, flutter_colorpicker, uuid, intl 등 주요 패키지 활용  
+   상태 관리: Provider  
+   플랫폼: iOS, Android, Web 지원  
+
+---
+
